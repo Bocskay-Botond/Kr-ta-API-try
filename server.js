@@ -10,17 +10,17 @@ const path = require('node:path');
 const PORT = 3000;
 
 // A Kréta IDP-be hardcodeolt HMAC kulcs (ASCII "5Kmpmgd5fJ").
-// A Kréta IDP-be hardcodeolt HMAC kulcs: ASCII "baSsxOwlU1jM".
-const HMAC_KEY = Buffer.from([98, 97, 83, 115, 120, 79, 119, 108, 85, 49, 106, 77]);
+const HMAC_KEY = Buffer.from([53, 75, 109, 112, 109, 103, 100, 53, 102, 74]);
 const IDP = 'https://idp.e-kreta.hu';
-const UA = 'hu.ekreta.tanulo/1.0.5/Android/0/0';
+const UA = 'hu.ekreta.student/1.0.5/Android/0/0';
 
-// Az első stratégia a Firka/reFilc bizonyítottan működő útja.
-// A többi csak biztonsági tartalék, ha az iskolád eltérne.
+// Több login-stratégia: az első, ami 200-at + access_token-t ad, nyer.
+// Az e-Kréta idővel váltogatta ezeket, ezért próbálunk többfélét.
 const STRATEGIES = [
   { ver: 'v2', hash: 'sha512', userField: 'userName', clientId: 'kreta-ellenorzo-mobile-android' },
   { ver: 'v1', hash: 'sha512', userField: 'userName', clientId: 'kreta-ellenorzo-mobile-android' },
-  { ver: 'v2', hash: 'sha512', userField: 'userName', clientId: 'kreta-ellenorzo-mobile' },
+  { ver: 'v2', hash: 'sha512', userField: 'username', clientId: 'kreta-ellenorzo-mobile' },
+  { ver: 'v1', hash: 'sha256', userField: 'username', clientId: 'kreta-ellenorzo-mobile' },
 ];
 
 async function getNonce() {
@@ -30,8 +30,7 @@ async function getNonce() {
 }
 
 function sign(username, institute, nonce, hash) {
-  // FONTOS: intézmény (NAGYBETŰ) + nonce + felhasználó (NAGYBETŰ), ebben a sorrendben.
-  const msg = (institute.toUpperCase() + nonce + username.toUpperCase());
+  const msg = (username.toLowerCase() + institute.toLowerCase() + nonce);
   return crypto.createHmac(hash, HMAC_KEY).update(msg, 'utf8').digest('base64');
 }
 
@@ -176,4 +175,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`\n  Kréta API teszt fut:  http://localhost:${PORT}\n  (leállítás: Ctrl+C)\n`);
 });
+
       
