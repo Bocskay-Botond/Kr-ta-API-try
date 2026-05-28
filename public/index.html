@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kréta API — kapcsolat teszt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e0f12; --panel:#16181d; --line:#262a31; --txt:#e7e9ee;
+    --dim:#8b909c; --accent:#ffb13b; --ok:#5ad17a; --err:#ff6b6b;
+    --mono:'JetBrains Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--bg);color:var(--txt);font-family:var(--sans);
+    line-height:1.5;min-height:100vh;
+    background-image:radial-gradient(circle at 15% -10%,#1b1d24 0,transparent 45%);
+  }
+  .wrap{max-width:720px;margin:0 auto;padding:48px 20px 80px}
+  .tag{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+  h1{font-family:var(--mono);font-weight:700;font-size:28px;margin:6px 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--dim);font-size:14px;margin-bottom:32px;max-width:56ch}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px}
+  label{display:block;font-family:var(--mono);font-size:12px;letter-spacing:.05em;color:var(--dim);margin:0 0 6px;text-transform:uppercase}
+  input{
+    width:100%;background:#0b0c0f;border:1px solid var(--line);color:var(--txt);
+    border-radius:8px;padding:12px 14px;font-family:var(--mono);font-size:14px;outline:none;transition:border-color .15s
+  }
+  input:focus{border-color:var(--accent)}
+  .field{margin-bottom:18px}
+  .row{display:flex;gap:8px}
+  .row input{flex:1}
+  button{
+    font-family:var(--mono);font-weight:600;font-size:14px;cursor:pointer;
+    border:none;border-radius:8px;padding:13px 18px;transition:transform .05s,filter .15s
+  }
+  button:active{transform:translateY(1px)}
+  .primary{background:var(--accent);color:#1a1206;width:100%;margin-top:6px}
+  .primary:disabled{filter:grayscale(.6) brightness(.7);cursor:wait}
+  .ghost{background:transparent;color:var(--accent);border:1px solid var(--line);white-space:nowrap}
+  .hint{font-size:12px;color:var(--dim);margin-top:6px}
+  .hint code{font-family:var(--mono);color:var(--accent)}
+  #out{margin-top:24px;display:none}
+  .verdict{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-weight:700;font-size:18px;padding:16px;border-radius:10px;border:1px solid var(--line)}
+  .verdict.ok{color:var(--ok);background:rgba(90,209,122,.07);border-color:rgba(90,209,122,.3)}
+  .verdict.err{color:var(--err);background:rgba(255,107,107,.07);border-color:rgba(255,107,107,.3)}
+  .dot{width:10px;height:10px;border-radius:50%;background:currentColor;box-shadow:0 0 12px currentColor}
+  .card{background:#0b0c0f;border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:14px}
+  .card h3{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:0 0 10px}
+  .kv{display:flex;justify-content:space-between;font-family:var(--mono);font-size:13px;padding:5px 0;border-bottom:1px dashed var(--line)}
+  .kv:last-child{border-bottom:none}
+  .kv span:first-child{color:var(--dim)}
+  .log{font-family:var(--mono);font-size:12px;white-space:pre-wrap;word-break:break-word;color:var(--dim);background:#0b0c0f;border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:14px;max-height:240px;overflow:auto}
+  .log .pass{color:var(--ok)} .log .fail{color:var(--err)} .log .try{color:var(--accent)}
+  #schoolbox{display:none;margin-top:10px;max-height:200px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+  .school{padding:9px 12px;font-family:var(--mono);font-size:12px;cursor:pointer;border-bottom:1px solid var(--line)}
+  .school:hover{background:#1c1f26}
+  .school b{color:var(--accent)}
+  .school small{color:var(--dim);display:block}
+  footer{margin-top:32px;font-size:12px;color:var(--dim);line-height:1.7}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tag">e-kréta · diagnosztika</div>
+  <h1>Kréta API kapcsolat&#8209;teszt</h1>
+  <p class="sub">Helyi proxyn keresztül bejelentkezik a Kréta mobil&#8209;API&#8209;ba, és lekér néhány jegyet. Több login&#8209;stratégiát is végigpróbál, és megmondja, melyik kombináció működik az iskoládnál. Az adataid csak a saját géped → e&#8209;kréta.hu úton mennek.</p>
+
+  <div class="panel">
+    <div class="field">
+      <label>Intézménykód</label>
+      <div class="row">
+        <input id="institute" placeholder="pl. klik035551001" autocomplete="off">
+        <button class="ghost" id="findBtn" type="button">Iskola keresése</button>
+      </div>
+      <div class="hint">Nem tudod a kódot? Keress rá az iskola nevére. (Pl. <code>klik...</code> kezdetű.)</div>
+      <div id="schoolbox"></div>
+    </div>
+    <div class="field">
+      <label>Felhasználónév (OM&#8209;azonosító)</label>
+      <input id="username" placeholder="pl. 7 jegyű OM-azonosító" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Jelszó</label>
+      <input id="password" type="password" placeholder="••••••••" autocomplete="off">
+    </div>
+    <button class="primary" id="testBtn" type="button">Kapcsolat tesztelése →</button>
+  </div>
+
+  <div id="out">
+    <div id="verdict" class="verdict"><span class="dot"></span><span id="verdictText"></span></div>
+    <div id="detail"></div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <footer>
+    Nem hivatalos eszköz, nincs köze az eKRÉTA Informatikai Zrt.&#8209;hez. A visszafejtett mobil&#8209;API bármikor változhat. Csak teszt&#8209;/tanulási célra.
+  </footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let schools = null;
+
+$('findBtn').onclick = async () => {
+  const box = $('schoolbox');
+  if (box.style.display === 'block') { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div class="school">Iskolalista betöltése…</div>';
+  try {
+    if (!schools) {
+      const r = await fetch('/api/institutes');
+      schools = await r.json();
+    }
+    renderSchools('');
+  } catch (e) {
+    box.innerHTML = '<div class="school">Nem sikerült betölteni a listát.</div>';
+  }
+};
+
+$('institute').addEventListener('input', e => {
+  if (schools && $('schoolbox').style.display === 'block') renderSchools(e.target.value);
+});
+
+function renderSchools(q) {
+  const box = $('schoolbox');
+  q = (q || '').toLowerCase().trim();
+  const list = schools.filter(s =>
+    !q || (s.name||'').toLowerCase().includes(q) || (s.instituteCode||'').toLowerCase().includes(q) || (s.city||'').toLowerCase().includes(q)
+  ).slice(0, 40);
+  if (!list.length) { box.innerHTML = '<div class="school">Nincs találat.</div>'; return; }
+  box.innerHTML = list.map(s =>
+    '<div class="school" data-code="'+s.instituteCode+'"><b>'+s.instituteCode+'</b><small>'+(s.name||'')+(s.city? ' · '+s.city:'')+'</small></div>'
+  ).join('');
+  box.querySelectorAll('.school').forEach(el => el.onclick = () => {
+    $('institute').value = el.dataset.code;
+    box.style.display = 'none';
+  });
+}
+
+$('testBtn').onclick = async () => {
+  const btn = $('testBtn');
+  const institute = $('institute').value.trim();
+  const username = $('username').value.trim();
+  const password = $('password').value;
+  if (!institute || !username || !password) { alert('Tölts ki minden mezőt.'); return; }
+
+  btn.disabled = true; btn.textContent = 'Tesztelés folyamatban…';
+  $('out').style.display = 'block';
+  $('verdict').className = 'verdict';
+  $('verdictText').textContent = 'Csatlakozás…';
+  $('detail').innerHTML = ''; $('log').textContent = '';
+
+  try {
+    const r = await fetch('/api/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ institute, username, password })
+    });
+    const data = await r.json();
+
+    $('log').innerHTML = (data.log || []).map(l => {
+      const cls = l.includes('✓') ? 'pass' : (l.includes('✗') ? 'fail' : (l.startsWith('→') ? 'try' : ''));
+      return '<span class="'+cls+'">'+l.replace(/</g,'&lt;')+'</span>';
+    }).join('\n');
+
+    if (data.ok) {
+      $('verdict').className = 'verdict ok';
+      $('verdictText').textContent = 'MŰKÖDIK — sikeres bejelentkezés';
+      let html = '<div class="card"><h3>Bejelentkezés</h3>';
+      html += kv('Működő stratégia', data.strategy);
+      if (data.studentName) html += kv('Tanuló', data.studentName);
+      if (data.instituteName) html += kv('Intézmény', data.instituteName);
+      html += kv('Token lejár (mp)', data.expiresIn || '?');
+      html += '</div>';
+      if (data.grades && data.grades.length) {
+        html += '<div class="card"><h3>Utolsó jegyek ('+data.gradeCount+' db összesen)</h3>';
+        html += data.grades.map(g => kv(g.subject + (g.date? ' · '+g.date : ''), g.value)).join('');
+        html += '</div>';
+      } else {
+        html += '<div class="card"><h3>Jegyek</h3>'+kv('Találat', (data.gradeCount||0)+' db')+'</div>';
+      }
+      $('detail').innerHTML = html;
+    } else {
+      $('verdict').className = 'verdict err';
+      $('verdictText').textContent = 'NEM sikerült bejelentkezni';
+      $('detail').innerHTML = '<div class="card"><h3>Hiba</h3><div class="kv"><span>Üzenet</span><span>'+(data.error||'ismeretlen')+'</span></div></div>';
+    }
+  } catch (e) {
+    $('verdict').className = 'verdict err';
+    $('verdictText').textContent = 'Hálózati / szerver hiba';
+    $('detail').innerHTML = '<div class="card"><h3>Hiba</h3><div class="kv"><span>Üzenet</span><span>'+e.message+'</span></div></div>';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Kapcsolat tesztelése →';
+  }
+};
+
+function kv(k, v){ return '<div class="kv"><span>'+k+'</span><span>'+(v==null?'—':v)+'</span></div>'; }
+</script>
+</body>
+</html>
